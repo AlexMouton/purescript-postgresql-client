@@ -24,10 +24,8 @@ main = void $ launchAff do
       )
     """) Row0
 
-    insert conn (Row2 "pork" true)
-    insert conn (Row2 "sauerkraut" false)
-    insert conn (Row2 "rookworst" true)
-
+    traverse (insert conn) [(Row2 "pork" true), (Row2 "sauerkraut" false), (Row2 "rookworst" true)]
+    
     names <- query conn (Query """
       SELECT name
       FROM foods
