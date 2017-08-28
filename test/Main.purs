@@ -8,7 +8,7 @@ import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (EXCEPTION, error)
 import Control.Monad.Error.Class (throwError, try)
 import Data.Maybe (Maybe(..))
-import Database.PostgreSQL (POSTGRESQL, PoolConfiguration, Query(..), Row0(..), Row1(..), Row2(..), Row6(..), execute, newPool, query, scalar, withConnection, withTransaction)
+import Database.PostgreSQL (POSTGRESQL, PoolConfiguration, Query(..), Row0(..), Row1(..), Row2(..), execute, newPool, query, scalar, withConnection, withTransaction)
 import Prelude
 import Test.Assert (ASSERT, assert)
 
@@ -26,8 +26,18 @@ main = void $ launchAff do
 
     execute conn (Query """
       INSERT INTO foods (name, delicious)
-      VALUES ($1, $2), ($3, $4), ($5, $6)
-    """) (Row6 "pork" true "sauerkraut" false "rookworst" true)
+      VALUES ($1, $2)
+    """) (Row2 "pork" true)
+
+    execute conn (Query """
+      INSERT INTO foods (name, delicious)
+      VALUES ($1, $2)
+    """) (Row2 "sauerkraut" false)
+
+    execute conn (Query """
+      INSERT INTO foods (name, delicious)
+      VALUES ($1, $2)
+    """) (Row2 "rookworst" true)
 
     names <- query conn (Query """
       SELECT name
