@@ -24,20 +24,9 @@ main = void $ launchAff do
       )
     """) Row0
 
-    execute conn (Query """
-      INSERT INTO foods (name, delicious)
-      VALUES ($1, $2)
-    """) (Row2 "pork" true)
-
-    execute conn (Query """
-      INSERT INTO foods (name, delicious)
-      VALUES ($1, $2)
-    """) (Row2 "sauerkraut" false)
-
-    execute conn (Query """
-      INSERT INTO foods (name, delicious)
-      VALUES ($1, $2)
-    """) (Row2 "rookworst" true)
+    insert conn (Row2 "pork" true)
+    insert conn (Row2 "sauerkraut" false)
+    insert conn (Row2 "rookworst" true)
 
     names <- query conn (Query """
       SELECT name
@@ -52,6 +41,17 @@ main = void $ launchAff do
 
     pure unit
   where
+
+  insert conn = execute conn (Query """
+      INSERT INTO foods (name, delicious)
+      VALUES ($1, $2)
+    """)
+
+  deleteAll conn =
+    execute conn (Query """
+      DELETE FROM foods
+    """) Row0
+
   testTransactionCommit conn = do
     deleteAll conn
     withTransaction conn do
@@ -72,11 +72,6 @@ main = void $ launchAff do
       testCount conn 1
       throwError $ error "fail"
     testCount conn 0
-
-  deleteAll conn =
-    execute conn (Query """
-      DELETE FROM foods
-    """) Row0
 
   testCount conn n = do
     count <- scalar conn (Query """
