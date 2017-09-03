@@ -7,42 +7,70 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (EXCEPTION, error)
 import Control.Monad.Error.Class (throwError, try)
+
+import Data.DateTime (DateTime)
+
+import Data.Either(fromRight)
+import Data.Formatter.DateTime (unformatDateTime)
 import Data.Maybe (Maybe(..))
-import Database.PostgreSQL (POSTGRESQL, PoolConfiguration, Query(..), Row0(..), Row1(..), Row2(..), execute, newPool, query, scalar, withConnection, withTransaction)
+import Data.Traversable (traverse)
+
+import Database.PostgreSQL (POSTGRESQL, PoolConfiguration, Query(..), Row0(..), Row1(..), Row3(..), execute, newPool, query, scalar, withConnection, withTransaction, toSQLValue, fromSQLValue)
+
+import Partial.Unsafe (unsafePartial)
+
 import Prelude
+
 import Test.Assert (ASSERT, assert)
 
 main :: ∀ eff. Eff (assert :: ASSERT, exception :: EXCEPTION, postgreSQL :: POSTGRESQL | eff) Unit
-main = void $ launchAff do
-  pool <- newPool config
-  withConnection pool \conn -> do
-    execute conn (Query """
-      CREATE TEMPORARY TABLE foods (
-        name text NOT NULL,
-        delicious boolean NOT NULL,
-        PRIMARY KEY (name)
-      )
-    """) Row0
+main = do
+  void $ launchAff do
+    pool <- newPool config
+    withConnection pool \conn -> do
+      execute conn (Query """
+        CREATE TEMPORARY TABLE foods (
+          name text NOT NULL,
+          delicious boolean NOT NULL,
+          last_eaten timestamp NOT NULL,
+          PRIMARY KEY (name)
+        )
+      """) Row0
 
-    traverse (insert conn) [(Row2 "pork" true), (Row2 "sauerkraut" false), (Row2 "rookworst" true)]
-    
-    names <- query conn (Query """
-      SELECT name
-      FROM foods
-      WHERE delicious
-      ORDER BY name ASC
-    """) Row0
-    liftEff <<< assert $ names == [Row1 "pork", Row1 "rookworst"]
+      _ <- traverse (insert conn) [
+        (Row3 "pork" true iso8601),
+        (Row3 "sauerkraut" false iso8601),
+        (Row3 "rookworst" true iso8601)
+      ]
 
-    testTransactionCommit conn
-    testTransactionRollback conn
+      names <- query conn (Query """
+        SELECT name
+        FROM foods
+        WHERE delicious
+        ORDER BY name ASC
+      """) Row0
+      liftEff <<< assert $ names == [Row1 "pork", Row1 "rookworst"]
 
-    pure unit
+      last_eatens <- query conn (Query """
+         SELECT last_eaten
+         FROM foods
+         where delicious
+         ORDER BY name ASC
+        """) Row0
+      liftEff <<< assert $ last_eatens == [Row1 iso8601, Row1 iso8601]
+
+      testTransactionCommit conn
+      testTransactionRollback conn
+
+      pure unit
   where
 
+  iso8601 :: DateTime
+  iso8601 = unsafePartial $ fromRight $ unformatDateTime "YYYY-MM-DD hh:mm:ss" "2014-02-20 11:11:11"
+
   insert conn = execute conn (Query """
-      INSERT INTO foods (name, delicious)
-      VALUES ($1, $2)
+      INSERT INTO foods (name, delicious, last_eaten)
+      VALUES ($1, $2, $3)
     """)
 
   deleteAll conn =
@@ -53,20 +81,14 @@ main = void $ launchAff do
   testTransactionCommit conn = do
     deleteAll conn
     withTransaction conn do
-      execute conn (Query """
-        INSERT INTO foods (name, delicious)
-        VALUES ($1, $2)
-      """) (Row2 "pork" true)
+      insert conn (Row3 "pork" true iso8601)
       testCount conn 1
     testCount conn 1
 
   testTransactionRollback conn = do
     deleteAll conn
     _ <- try $ withTransaction conn do
-      execute conn (Query """
-        INSERT INTO foods (name, delicious)
-        VALUES ($1, $2)
-      """) (Row2 "pork" true)
+      insert conn (Row3 "pork" true iso8601)
       testCount conn 1
       throwError $ error "fail"
     testCount conn 0
