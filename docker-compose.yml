@@ -1,0 +1,20 @@
+version: "2"
+services:
+  web:
+    build: .
+    volumes:
+      - ".:/app"
+    environment:
+      PGHOST: pg
+      PGDATABASE: pure
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    links:
+      - pg
+    depends_on:
+      - pg
+
+  pg:
+    image: postgres:9.6.1
+    ports:
+      - 5432
