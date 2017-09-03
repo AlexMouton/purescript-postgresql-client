@@ -1,4 +1,9 @@
 /.pulp-cache
+/.psci_modules
+/.cache
+/.local
+/.config
+/.psc-ide-port
 /bower_components
 /node_modules
 /output
