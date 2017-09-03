@@ -1,18 +1,23 @@
 module Database.PostgreSQL.Value where
 
+import Control.Error.Util (note)
 import Control.Monad.Eff (kind Effect)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (runExcept)
+
 import Data.Array as Array
-import Data.Bifunctor (lmap)
+import Data.Bifunctor (bimap, lmap)
 import Data.ByteString (ByteString)
+import Data.DateTime (DateTime)
 import Data.DateTime.Instant (Instant)
 import Data.Either (Either)
 import Data.Foreign (Foreign, isNull, readArray, readBoolean, readChar, readInt, readNumber, readString, toForeign, unsafeFromForeign)
+import Data.JSDate(readDate, toDateTime, fromDateTime)
 import Data.List (List)
 import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
+
 import Prelude
 
 -- | Convert things to SQL values.
@@ -75,6 +80,12 @@ instance fromSQLValueByteString :: FromSQLValue ByteString where
 
 instance toSQLValueInstant :: ToSQLValue Instant where
     toSQLValue = instantToString
+
+instance fromSQLValueDateTime :: FromSQLValue DateTime where
+    fromSQLValue = join <<< (bimap show ((note "JSDate gave invalid DateTime") <<< toDateTime) ) <<< runExcept <<< readDate
+
+instance toSQLValueDateTime :: ToSQLValue DateTime where
+    toSQLValue = toForeign <<< fromDateTime
 
 instance toSQLValueMaybe :: (ToSQLValue a) => ToSQLValue (Maybe a) where
     toSQLValue Nothing = null
